@@ -1,0 +1,201 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName #provide input (Key Pair)
+    Description: Name of your exixting Key Pair to enable SSH access to instance
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-053a45fff0a704a47
+    us-east-2:
+      AMI: ami-0604f27d956d83a4d
+    us-west-1:
+      AMI: ami-0e443b903466f6804
+    us-west-2:
+      AMI: ami-09245d5773578a1d6
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: VPC-Tutoria
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      Tags:
+        - Key: Name
+          Value: VPC-Tutorial-Subnet
+  Internetgateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: VPC-Tutorial-InternetGateway
+  VPCGateWayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref Internetgateway
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: VPC-Tutorial-Routetable
+  SubnetRoutetableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet
+  InternetGateWayroute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTable
+      GatewayId: !Ref Internetgateway
+      DestinationCidrBlock: 0.0.0.0/0
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: Tutorial Security Group
+      GroupDescription: Security group for SNS VPC endpoing tutorial
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: '-1'
+          CidrIp: 10.0.0.0/16
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 10.0.0.0/16
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: Tutorial-Security-Group
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: Tutorial-InstanceRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+  EC2instanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2InstanceRole
+      InstanceProfileName: TutorialEC2InstanceProfile
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      KeyName: !Ref KeyName
+      InstanceType: t2.micro
+      ImageId: !FindInMap
+        - RegionMap
+        - !Ref AWS::Region
+        - AMI
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet:
+            - !Ref SecurityGroup
+          SubnetId: !Ref Subnet
+      IamInstanceProfile: !Ref EC2instanceProfile
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  LambdaFunction1:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          from __future__ import print_function
+          print('Loading function')
+          def lambda_handler(event, context):
+            message = event['Records'][0]['Sns']['Message']
+            print("From SNS: " + message)
+            return message
+      Description: SNS VPC endpoint tutorial lambda function 1
+      FunctionName: Tutorial-Lambda-1
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.9
+      Timeout: 3
+  LambdaPermission1:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaFunction1
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref SNSTopic
+  LambdaLogGroup1:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${LambdaFunction1}
+      RetentionDays: 7
+  LambdaFunction2:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          from __future__ import print_function
+          print('Loading function')
+          def lambda_handler(event, context):
+            message = event['Records'][0]['Sns']['Message']
+            print("From SNS: " + message)
+            return message
+      Description: SNS VPC endpoint tutorial lambda function 2
+      FunctionName: VPCE-Tutorial-Lambda-2
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.9
+      Timeout: 3
+  LambdaPermission2:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaFunction2
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref SNSTopic
+  LambdaLogGroup2:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${LambdaFunction2}
+      RetentionInDays: 7
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: SNS-Tutorial-Topic
+      TopicName: Tutorial-Topic
+      Subscription:
+        - Endpoint: !GetAtt LambdaFunction1.Arn
+          Protocol: lambda
+        - Endpoint: !GetAtt LambdaFunction2.Arn
+          Protocol: lambda
