@@ -61,7 +61,7 @@ The CloudFormation template sets up the following:
      ```
    - Check **CloudWatch Logs** to verify if Lambda functions received and processed the message.
 
-3. **(Optional) Create an SNS VPC Endpoint:**
+3. **Create an SNS VPC Endpoint:**
 
    - If private communication is needed, manually create an **SNS VPC Endpoint** and test Lambda’s access without internet connectivity.
 
