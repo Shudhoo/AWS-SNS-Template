@@ -2,13 +2,7 @@
 
 ## Overview
 
-This CloudFormation template automates the deployment of an AWS infrastructure that includes:
-
-- A **VPC** with a subnet, route table, and internet gateway.
-- An **EC2 instance** with SSH access and SNS publishing permissions.
-- Two **Lambda functions** that process SNS messages and log them to CloudWatch.
-- An **SNS topic** for event-driven communication.
-- Security groups and IAM roles for access control.
+This AWS CloudFormation template sets up an infrastructure that includes a Virtual Private Cloud (VPC), an EC2 instance, IAM roles, Lambda functions, and an Amazon SNS topic. The primary objective of this stack is to create a secure environment with a VPC and associated networking components, launch an EC2 instance with necessary permissions, and configure AWS Lambda functions that process messages from an SNS topic.
 
 ## Architecture
 
